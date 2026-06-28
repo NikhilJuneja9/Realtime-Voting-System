@@ -19,7 +19,7 @@ if __name__ == "__main__":
         raise(e)
 
     vote_schema = StructType([
-        StructField("voter_id", StringType(), True),
+        StructField("voter_id", StringType(), True), # True means voter_id can be nullable
         StructField("candidate_id", StringType(), True),
         StructField("voting_time", TimestampType(), True),
         StructField("voter_name", StringType(), True),
@@ -32,13 +32,11 @@ if __name__ == "__main__":
         StructField("gender", StringType(), True),
         StructField("nationality", StringType(), True),
         StructField("registration_number", StringType(), True),
-        StructField("address", StructType([
-            StructField("street", StringType(), True),
-            StructField("city", StringType(), True),
-            StructField("state", StringType(), True),
-            StructField("country", StringType(), True),
-            StructField("postcode", StringType(), True)
-        ]), True),
+      StructField("address_street", StringType(), True),  
+    StructField("address_city", StringType(), True),    
+    StructField("address_state", StringType(), True),   
+    StructField("address_country", StringType(), True), 
+    StructField("address_postcode", StringType(), True),
         StructField("email", StringType(), True),
         StructField("phone_number", StringType(), True),
         StructField("cell_number", StringType(), True),
@@ -66,8 +64,8 @@ if __name__ == "__main__":
     # Aggregate votes per candidate and turnout by location
     votes_per_candidate = enriched_votes_df.groupBy("candidate_id", "candidate_name", "party_affiliation",
                                                     "photo_url").agg(_sum("vote").alias("total_votes"))
-    turnout_by_location = enriched_votes_df.groupBy("address.state").count().alias("total_votes")
-
+    turnout_by_location = enriched_votes_df.groupBy("address_state").count().withColumnRenamed("count", "total_votes")
+    print(turnout_by_location)
 try:
     # Starting streaming queries
     votes_per_candidate_to_kafka = (votes_per_candidate.selectExpr('to_json(struct(*)) as value')

@@ -25,6 +25,7 @@ if __name__ ==  "__main__":
     conn = psycopg2.connect("host=localhost dbname=voting user=postgres password=postgres" )
     curr = conn.cursor()
     
+    # converting the candidate column and row into json
     curr.execute(
     """ select row_to_json(cols) from (SELECT * FROM candidates) as cols
     
@@ -34,39 +35,36 @@ if __name__ ==  "__main__":
     
     if len(candidates) ==0:
         raise Exception("No candidate found in the database")
-    else:
-        print(candidates)
+  
         
-    consumer.subscribe(['voters-topic'])
+    # consumer.subscribe(['voters-topic'])
     try:
-        while True:
-            msg = consumer.poll(timeout = 1.0)
-            if msg is None:
-                continue
-            elif msg.error():
-                if msg.error().code() == KafkaError._PARTITION_EOF: # this error arises when the consumer is reached the end of the commit and there is no  more message 
-                    continue
-                else:
-                    print(f"error arising in consumer{msg.error()}")
-                    break
-            else:
-                print("consumer is working fine")
-                voter = json.loads(msg.value().decode('utf-8'))
+            curr.execute("select row_to_json(cols) FROM (SELECT * FROM voters) as cols")
+            voters = curr.fetchall()
+            
+            for voter in voters:  
+                voter = voter[0]
+
                 chosen_candidate =  random.choice(candidates)
                 print("candidate is chosen")
                 vote =  voter | chosen_candidate | {
                     "voting_time": datetime.now(pytz.UTC).strftime("%Y-%m-%d %H:%M:%S"),
                     "vote":1
                 }
+                print(vote)
                 
                 try:
                     print('user {} is voting for candidate {}'.format(vote['voter_id'], vote['candidate_id']))
                     curr.execute("""
-                                 INSERT INTO votes(voter_id,candidate_id,voting_time)
-                                 VALUES (%s, %s, %s)
-                                 """,(vote['voter_id'], vote['candidate_id'],vote['voting_time']))
+                                    INSERT INTO votes(voter_id,candidate_id,voting_time)
+                                    VALUES (%s, %s, %s)
+                                    """,(vote['voter_id'], vote['candidate_id'],vote['voting_time']))
                     conn.commit()
-                    
+            
+                except  Exception as e:
+                    print(f"error while storing the vote in psql with exception {e}")
+                
+                try:
                     producer.produce(
                         topic='votes_topic',
                         key = vote['voter_id'],
@@ -74,9 +72,13 @@ if __name__ ==  "__main__":
                         on_delivery=delivery_report
                     )
                     producer.poll(0)
+                    producer.flush()
+    
                 except  Exception as e:
-                    print(e)
-            time.sleep(1)
+                    print(f"error while sending the vote over kafka with exception {e}")
+
+                time.sleep(20)
+
     except Exception as e:
         print(e)
     

@@ -148,7 +148,8 @@ def update_data():
     consumer = create_kafka_consumer(topic_name)
     data =  fetch_data_from_kafka(consumer)
     results = pd.DataFrame(data)
-    print(data)
+    print(f"dataframe - {data}")
+    
     #Identify the leading candidate
     results = results.loc[results.groupby('candidate_id')['total_votes'].idxmax()]
     leading_candidate = results.loc[results['total_votes'].idxmax()]
@@ -189,9 +190,9 @@ def update_data():
     location_consumer =create_kafka_consumer("aggregated_turnout_by_location")
     location_data = fetch_data_from_kafka(location_consumer)
     location_result = pd.DataFrame(location_data)
-    
+    print(f"location result - {location_result}")
     #max location identification
-    location_result = location_result.loc[location_result.groupby('state')['count'].idxmax()]
+    location_result = location_result.loc[location_result.groupby('address_state')['total_votes'].idxmax()]
     location_result = location_result.reset_index(drop = True)
     
     # display the location of voters

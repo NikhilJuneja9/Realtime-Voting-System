@@ -10,6 +10,9 @@ BASE_URL = 'https://randomuser.me/api/?nat=in' # random api which generate rando
 PARTIES = ['Bharosa Jumla Party ','Confuse Party','Angry Aadmi Party']
 
 random.seed(21)
+##################################################################################
+# creating the reqd table in postgres
+##################################################################################
 def create_table(conn,cur):
     cur.execute(
         """
@@ -56,6 +59,10 @@ def create_table(conn,cur):
     """)
     
     conn.commit()
+##############################################################
+# Generating the reqd data
+##############################################################
+
 
 def generate_candidate_data(candidate_number,total_parties):
     response = requests.get(BASE_URL +'&gender=' + ('female' if candidate_number %2 == 1 else 'male') )
@@ -116,6 +123,16 @@ def insert_voters(conn, cur, voter):
                  voter['cell_number'], voter['picture'], voter['registered_age'])
                 )
     conn.commit()
+    
+def insert_candidate_data(cur,candidate):
+    
+    cur.execute(
+    """
+    INSERT INTO candidates(candidate_id, candidate_name, party_affiliation, biography,campaign_platform,photo_url)
+    VALUES(%s, %s, %s, %s, %s, %s)
+    """,(
+        candidate['candidate_id'], candidate['candidate_name'],candidate['party_affiliation'],
+        candidate['biography'],candidate['campaign_platform'],candidate['photo_url']))
 
 def delivery_report(err,msg):
     if err is not None:
@@ -142,35 +159,43 @@ if __name__ == "__main__":
         if len(candidates) == 0:
             for i in range(3):
                 candidate = generate_candidate_data(i,3)
-                print(i)
                 print(candidate)
-                cur.execute(
-    """
-    INSERT INTO candidates(candidate_id, candidate_name, party_affiliation, biography,campaign_platform,photo_url)
-    VALUES(%s, %s, %s, %s, %s, %s)
-    """,(
-        candidate['candidate_id'], candidate['candidate_name'],candidate['party_affiliation'],
-        candidate['biography'],candidate['campaign_platform'],candidate['photo_url']
-    )
-                )
+                insert_candidate_data(cur,candidate)
+                
+    #             cur.execute(
+    # """
+    # INSERT INTO candidates(candidate_id, candidate_name, party_affiliation, biography,campaign_platform,photo_url)
+    # VALUES(%s, %s, %s, %s, %s, %s)
+    # """,(
+    #     candidate['candidate_id'], candidate['candidate_name'],candidate['party_affiliation'],
+    #     candidate['biography'],candidate['campaign_platform'],candidate['photo_url']
+    # )
+    #             )
         conn.commit()
-     # generating voter data and inserting into the respective table 
-        for i in range(500): # generating random 500 voters data
+        
+        
+     # generating voter data and inserting into the respective table  
+        for i in range(1000): # generating random 2000 voters data
             voter_data =  generate_voters_data()
             insert_voters(conn,cur,voter_data)
-            try:  
-                producer.produce(
-                    topic="voters-topic",
-                    key=voter_data["voter_id"],
-                    value=json.dumps(voter_data),
-                    on_delivery=delivery_report
-                )
-            except Exception as e:
-              print(f"error while connecting broker with error {e}")
+            # try:  
+            #     producer.produce(
+            #         topic="voters-topic",
+            #         key=voter_data["voter_id"],
+            #         value=json.dumps(voter_data),
+            #         on_delivery=delivery_report
+            #     )
+            # except Exception as e:
+            #   print(f"error while connecting broker with error {e}")
               
               
             print(f"Produced voter {i} with data {voter_data}")
             
-            producer.flush()
+            # producer.flush()
     except Exception as e:
         print(f"error - {e}")
+        
+        
+
+#### AFTER this script 3 tables will be created in postgres candidates, voters, votes. Data is feeded to voters and candidate table.
+#### Voter were send to kafka topic
